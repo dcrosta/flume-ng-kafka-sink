@@ -44,9 +44,9 @@ public class KafkaSinkUtil {
 		}
 		return props;
 	}
-	public static Producer<String, String> getProducer(Context context) {
-		Producer<String, String> producer;
-		producer = new Producer<String, String>(new ProducerConfig(getKafkaConfigProperties(context)));
+	public static Producer<String, byte[]> getProducer(Context context) {
+		Producer<String, byte[]> producer;
+		producer = new Producer<String, byte[]>(new ProducerConfig(getKafkaConfigProperties(context)));
 		return producer;
 	}
 }

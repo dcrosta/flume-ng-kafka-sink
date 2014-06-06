@@ -18,6 +18,7 @@
  *******************************************************************************/
 package org.apache.flume.sink.kafka;
 
+import java.util.Map;
 import kafka.javaapi.producer.Producer;
 import kafka.producer.KeyedMessage;
 import org.apache.flume.*;
@@ -45,16 +46,11 @@ import org.slf4j.LoggerFactory;
 public class KafkaSink extends AbstractSink implements Configurable {
     private static final Logger log = LoggerFactory.getLogger(KafkaSink.class);
     private String topic;
-    //partition.key
-    private String partition;
-    private Producer<String, String> producer;
-
-    private static final String DEFAULT_ENCODING = "UTF-8";
+    private String partitionKey;
+    private Producer<String, byte[]> producer;
 
 
     public Status process() throws EventDeliveryException {
-
-        Status status = null;
         Channel channel = getChannel();
         Transaction tx = channel.getTransaction();
         try {
@@ -62,37 +58,36 @@ public class KafkaSink extends AbstractSink implements Configurable {
             Event event = channel.take();
             if (event == null) {
                 tx.commit();
-                status =  Status.BACKOFF;
-                log.debug("null event data");
-
+                return Status.BACKOFF;
             } else {
+                byte[] message = event.getBody();
+                KeyedMessage<String, byte[]> data = null;
 
-                log.debug("processing event data");
-                String eventData = new String(event.getBody(), DEFAULT_ENCODING);
-                KeyedMessage<String, String> data = (partition == null || partition.isEmpty()) ? new KeyedMessage<String, String>(topic,
-                        eventData) : new KeyedMessage<String, String>(topic, partition, eventData);
+                Map<String, String> headers = event.getHeaders();
+                if (partitionKey != null && headers.containsKey(partitionKey)) {
+                    String partition = headers.get(partitionKey);
+                    data = new KeyedMessage<String, byte[]>(topic, partition, message);
+                } else {
+                    data = new KeyedMessage<String, byte[]>(topic, message);
+                }
 
-                log.info("Sending Message to Kafka : [" + topic + ":" + eventData + "]");
                 producer.send(data);
-
                 tx.commit();
-                status = Status.READY;
-                log.debug("Send message successfully.");
+
+                log.debug("Sent message to Kafka : [" + topic + ":" + message.length + " bytes]");
+                return Status.READY;
             }
         } catch (Exception e) {
+            log.error("KafkaSink exception:{}", e);
             try {
                 tx.rollback();
-                return Status.BACKOFF;
             } catch (Exception e2) {
-                log.error("Rollback Exception:{}", e2);
+                log.error("Rollback exception:{}", e2);
             }
-            log.error("KafkaSink Exception:{}", e);
             return Status.BACKOFF;
         } finally {
             tx.close();
         }
-
-        return status;
     }
 
     public void configure(Context context) {
@@ -102,7 +97,10 @@ public class KafkaSink extends AbstractSink implements Configurable {
             throw new ConfigurationException("Kafka topic must be specified.");
         }
 
-        partition = context.getString("partition.key");
+        partitionKey = context.getString("partition.key");
+        if (partitionKey.isEmpty()) {
+            partitionKey = null;
+        }
 
         producer = KafkaSinkUtil.getProducer(context);
     }
