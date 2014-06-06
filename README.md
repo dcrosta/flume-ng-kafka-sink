@@ -12,9 +12,12 @@ Configuration of Kafka Sink
     producer.sinks.kafka.zk.connect = 192.168.86.5:2181
     producer.sinks.kafka.metadata.broker.list = 192.168.86.10:9092
     producer.sinks.kafka.topic = kafkaRocks
-    producer.sinks.kafka.serializer.class=kafka.serializer.StringEncoder
+    producer.sinks.kafka.serializer.class=kafka.serializer.DefaultEncoder
+    producer.sinks.kafka.partition.key=partition-key
     producer.sinks.kafka.request.required.acks=1
     producer.sinks.kafka.max.message.size=1000000
+
+`partition.key` should be set to a field that producers will set as a header in Flumed messages.
 
 For detailed/full flume sink config, please refer to the sample configuration files in the [samples/flume-conf folder](https://github.com/alanma/flume-ng-kafka-sink/tree/master/samples/flume-conf).
 
